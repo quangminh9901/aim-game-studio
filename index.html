@@ -608,6 +608,9 @@ body {
         <span class="icon">&#x1F4C2;</span> My Projects
         <span class="badge" id="projectCount">0</span>
       </button>
+      <button class="nav-item" onclick="startDeployFromNav()">
+        <span class="icon">&#x1F680;</span> Deploy Project
+      </button>
     </div>
     <div class="nav-section">
       <div class="nav-section-title">Support</div>
@@ -1172,11 +1175,16 @@ function saveProject(d, yaml) {
   updateProjectCount();
   state.currentFlow = null;
 
-  botReply(`Project "${d.name}" saved! You can find it in My Projects. What would you like to do next?`).then(() => {
+  botReply(`Project "${d.name}" saved! Now let's set it up for real.`).then(() => {
     addActions([
-      { label:'View My Projects', icon:'&#x1F4C2;', action: () => showPage('projects') },
-      { label:'Create Another', icon:'&#x2795;', action: () => startFlow('new-project') },
-      { label:'Go to Dashboard', icon:'&#x1F4CA;', action: () => showPage('dashboard') },
+      { label:'Deploy Now', primary: true, icon:'&#x1F680;', action: () => startDeployGuide(project) },
+      { label:'Deploy Later', action: () => {
+        addActions([
+          { label:'View My Projects', icon:'&#x1F4C2;', action: () => showPage('projects') },
+          { label:'Create Another', icon:'&#x2795;', action: () => startFlow('new-project') },
+          { label:'Go to Dashboard', icon:'&#x1F4CA;', action: () => showPage('dashboard') },
+        ]);
+      }},
     ]);
   });
 }
@@ -1208,6 +1216,8 @@ function sendMessage() {
   const lower = text.toLowerCase();
   if (lower.includes('new project') || lower.includes('create') || lower === 'start') {
     startFlow('new-project');
+  } else if (lower.includes('deploy') || lower.includes('setup') || lower.includes('install')) {
+    startDeployFromNav();
   } else if (lower.includes('template')) {
     showPage('templates');
   } else if (lower.includes('my project') || lower.includes('projects')) {
@@ -1346,6 +1356,301 @@ function deleteProject(id) {
   saveState();
   updateProjectCount();
   renderProjects();
+}
+
+/* ===== DEPLOY GUIDE ===== */
+const DEPLOY_STEPS = ['Method', 'Setup', 'Config', 'Engine', 'Launch'];
+
+function startDeployGuide(project) {
+  state.currentFlow = 'deploy';
+  state.flowStep = 0;
+  state.deployProject = project || state.projects[state.projects.length - 1];
+  if (!state.deployProject) {
+    botReply("No project found. Create a project first!");
+    return;
+  }
+
+  addProgressSteps(DEPLOY_STEPS, 0);
+  botReply("Let's deploy your project! How do you want to set it up?").then(() => {
+    addOptions([
+      { icon:'&#x1F4BB;', title:'I have Claude Code', desc:'I already have Claude Code CLI installed and ready to use.', action: () => deployWithClaudeCode() },
+      { icon:'&#x1F464;', title:'Give to a developer', desc:'I want to hand off the config to someone technical.', action: () => deployHandoff() },
+      { icon:'&#x1F331;', title:'Start from scratch', desc:"I'm new — walk me through everything from zero.", action: () => deployFromScratch() },
+    ]);
+  });
+}
+
+function deployFromScratch() {
+  state.flowStep = 1;
+  addProgressSteps(DEPLOY_STEPS, 1);
+
+  botReply("No problem! Let's get everything set up step by step.").then(() => {
+    addInfoBox(`<strong>Step 1: Install required tools</strong><br><br>
+You need these 3 things installed on your computer:<br><br>
+<strong>1. Git</strong> — version control<br>
+&nbsp;&nbsp;Download: <a href="https://git-scm.com/downloads" target="_blank" style="color:var(--accent)">git-scm.com/downloads</a><br><br>
+<strong>2. Node.js</strong> — runtime environment<br>
+&nbsp;&nbsp;Download: <a href="https://nodejs.org" target="_blank" style="color:var(--accent)">nodejs.org</a> (LTS version)<br><br>
+<strong>3. Claude Code</strong> — the AI assistant<br>
+&nbsp;&nbsp;Install by running this in your terminal:<br>
+<code style="background:var(--bg-primary);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">npm install -g @anthropic-ai/claude-code</code>`);
+
+    setTimeout(() => {
+      addActions([
+        { label:'Done installing! Next step', primary: true, icon:'&#x2705;', action: () => deployStep2_clone() },
+        { label:'What is a terminal?', action: () => {
+          botReply("A terminal is where you type commands on your computer.<br><br><strong>Windows:</strong> Search for \"PowerShell\" or \"Command Prompt\" in Start menu.<br><strong>Mac:</strong> Open \"Terminal\" from Applications > Utilities.<br><strong>Linux:</strong> Press Ctrl+Alt+T.").then(() => {
+            addActions([
+              { label:'Got it! Next step', primary: true, icon:'&#x2705;', action: () => deployStep2_clone() },
+            ]);
+          });
+        }},
+      ]);
+    }, 300);
+  });
+}
+
+function deployStep2_clone() {
+  state.flowStep = 2;
+  addProgressSteps(DEPLOY_STEPS, 2);
+  const p = state.deployProject;
+
+  botReply("Great! Now let's download the game studio framework and add your config.").then(() => {
+    const commands = `# Open your terminal and run these commands one by one:
+
+# 1. Download the framework
+git clone https://github.com/Donchitos/Claude-Code-Game-Studios.git "${p.name}"
+
+# 2. Go into the project folder
+cd "${p.name}"`;
+
+    addConfigOutput(commands, true);
+
+    setTimeout(() => {
+      addInfoBox(`<strong>What this does:</strong><br>
+Downloads the Claude Code Game Studios framework — 49 AI agents, 74 skills — into a folder named "${p.name}" on your computer.`);
+
+      setTimeout(() => {
+        addActions([
+          { label:'Done! Next step', primary: true, icon:'&#x2705;', action: () => deployStep3_config(p) },
+        ]);
+      }, 300);
+    }, 300);
+  });
+}
+
+function deployStep3_config(p) {
+  state.flowStep = 3;
+  addProgressSteps(DEPLOY_STEPS, 3);
+
+  botReply("Now paste your project config into the project.").then(() => {
+    addInfoBox(`<strong>Option A: Automatic (recommended)</strong><br>
+Click the button below to download <code>project.yaml</code>, then move it into your <code>"${p.name}"</code> folder, replacing the existing file.<br><br>
+<strong>Option B: Manual</strong><br>
+Open the file <code>project.yaml</code> inside the <code>"${p.name}"</code> folder with any text editor (Notepad, VS Code, etc.) and paste your config.`);
+
+    addConfigOutput(p.yaml, true);
+
+    setTimeout(() => {
+      addActions([
+        { label:'Download project.yaml', primary: true, icon:'&#x1F4E5;', action: () => {
+          downloadConfig(p.name, p.yaml);
+          setTimeout(() => {
+            addActions([
+              { label:'File placed! Next step', primary: true, icon:'&#x2705;', action: () => deployStep4_engine(p) },
+            ]);
+          }, 500);
+        }},
+        { label:'I copied it manually. Next step', icon:'&#x2705;', action: () => deployStep4_engine(p) },
+      ]);
+    }, 300);
+  });
+}
+
+function deployStep4_engine(p) {
+  state.flowStep = 4;
+  addProgressSteps(DEPLOY_STEPS, 4);
+  const engineNames = { godot:'Godot 4', unity:'Unity', unreal:'Unreal Engine 5' };
+  const engineUrls = {
+    godot: 'https://godotengine.org/download',
+    unity: 'https://unity.com/download',
+    unreal: 'https://www.unrealengine.com/download',
+  };
+  const engineTips = {
+    godot: 'Download the <strong>Standard</strong> version (not .NET). Open it and create a new project pointing to your folder.',
+    unity: 'Download <strong>Unity Hub</strong> first, then install the latest LTS editor. Open your project folder from the Hub.',
+    unreal: 'Download the <strong>Epic Games Launcher</strong>, then install UE5. Create a new project or open your folder.',
+  };
+
+  botReply(`Almost done! You need <strong>${engineNames[p.engine]}</strong> installed to actually build the game.`).then(() => {
+    addInfoBox(`<strong>Install ${engineNames[p.engine]}</strong><br><br>
+Download: <a href="${engineUrls[p.engine]}" target="_blank" style="color:var(--accent)">${engineUrls[p.engine]}</a><br><br>
+${engineTips[p.engine]}`);
+
+    setTimeout(() => {
+      addActions([
+        { label:'Engine ready! Final step', primary: true, icon:'&#x2705;', action: () => deployStep5_launch(p) },
+        { label:'Skip for now', action: () => deployStep5_launch(p) },
+      ]);
+    }, 300);
+  });
+}
+
+function deployStep5_launch(p) {
+  addProgressSteps(DEPLOY_STEPS, 5);
+  state.currentFlow = null;
+
+  botReply("You're all set! Here's how to launch your AI game studio:").then(() => {
+    const launchCmd = `# Make sure you're in the project folder:
+cd "${p.name}"
+
+# Start Claude Code:
+claude
+
+# Once Claude Code opens, type:
+/start
+
+# This runs the guided onboarding:
+# - Confirms your engine & language
+# - Sets up project structure
+# - Creates your first design document
+# - You're ready to build!`;
+
+    addConfigOutput(launchCmd, true);
+
+    setTimeout(() => {
+      addInfoBox(`<strong>What happens when you run <code>/start</code>:</strong><br><br>
+1. Claude Code reads your <code>project.yaml</code><br>
+2. It sets up the engine (Godot/Unity/Unreal) configuration<br>
+3. It asks you to describe your game idea<br>
+4. 49 AI agents start helping you — from game design, programming, art, audio, to QA<br>
+5. You make decisions, they do the work!<br><br>
+<strong>Useful commands after setup:</strong><br>
+<code>/design-system</code> — Define your game's look and feel<br>
+<code>/create-epics</code> — Plan major features<br>
+<code>/create-stories</code> — Break features into tasks<br>
+<code>/dev-story</code> — Start coding a task<br>
+<code>/story-done</code> — Mark a task complete`);
+
+      setTimeout(() => {
+        addActions([
+          { label:'View My Projects', icon:'&#x1F4C2;', action: () => showPage('projects') },
+          { label:'Create Another Project', icon:'&#x2795;', action: () => startFlow('new-project') },
+          { label:'Back to Dashboard', icon:'&#x1F4CA;', action: () => showPage('dashboard') },
+        ]);
+      }, 300);
+    }, 300);
+  });
+}
+
+function deployWithClaudeCode() {
+  state.flowStep = 2;
+  addProgressSteps(DEPLOY_STEPS, 2);
+  const p = state.deployProject;
+
+  botReply("Since you have Claude Code ready, here's the quick setup:").then(() => {
+    const commands = `# 1. Clone the framework
+git clone https://github.com/Donchitos/Claude-Code-Game-Studios.git "${p.name}"
+cd "${p.name}"
+
+# 2. Download and place your project.yaml (button below)
+#    Or copy-paste the config into the existing project.yaml
+
+# 3. Launch Claude Code and start
+claude
+# Then type: /start`;
+
+    addConfigOutput(commands, true);
+    addConfigOutput(p.yaml, true);
+
+    setTimeout(() => {
+      addActions([
+        { label:'Download project.yaml', primary: true, icon:'&#x1F4E5;', action: () => {
+          downloadConfig(p.name, p.yaml);
+          botReply("Done! Place the file in your project root and run <code>claude</code> then <code>/start</code>. The 49 agents will set up everything from there.");
+        }},
+        { label:'Full step-by-step guide', action: () => deployStep3_config(p) },
+      ]);
+    }, 300);
+  });
+}
+
+function startDeployFromNav() {
+  showPage('chat');
+  if (state.projects.length === 0) {
+    botReply("You don't have any projects yet. Create one first, then we'll deploy it!").then(() => {
+      addActions([
+        { label:'Create New Project', primary: true, icon:'&#x2795;', action: () => startFlow('new-project') },
+      ]);
+    });
+    return;
+  }
+  if (state.projects.length === 1) {
+    startDeployGuide(state.projects[0]);
+    return;
+  }
+  botReply("Which project do you want to deploy?").then(() => {
+    addOptions(state.projects.slice().reverse().map(p => ({
+      icon:'&#x1F3AE;', title: p.name, desc: `${p.engine} | ${p.genre}`,
+      action: () => startDeployGuide(p),
+    })));
+  });
+}
+
+function deployHandoff() {
+  const p = state.deployProject;
+
+  botReply("Here's everything your developer needs to set up this project:").then(() => {
+    const handoff = `=== DEVELOPER HANDOFF ===
+Project: ${p.name}
+Generated: ${new Date().toLocaleDateString('vi-VN')}
+
+--- SETUP INSTRUCTIONS ---
+
+1. Clone the framework:
+   git clone https://github.com/Donchitos/Claude-Code-Game-Studios.git "${p.name}"
+   cd "${p.name}"
+
+2. Replace project.yaml with the config below.
+
+3. Install Claude Code (if not already):
+   npm install -g @anthropic-ai/claude-code
+
+4. Run: claude
+5. Type: /start
+6. Follow the onboarding wizard.
+
+--- PROJECT CONFIG (project.yaml) ---
+
+${p.yaml}
+
+--- NOTES ---
+- Framework: Claude Code Game Studios v1.2.0
+- Docs: https://github.com/Donchitos/Claude-Code-Game-Studios
+- 49 AI agents + 74 skills included
+- /start runs the full setup wizard`;
+
+    addConfigOutput(handoff, true);
+
+    setTimeout(() => {
+      addActions([
+        { label:'Download handoff file', primary: true, icon:'&#x1F4E5;', action: () => {
+          const blob = new Blob([handoff], { type: 'text/plain' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${p.name.replace(/\s+/g,'-').toLowerCase()}-setup.txt`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          botReply("Handoff file downloaded! Send it to your developer along with the project.yaml.");
+        }},
+        { label:'Copy to clipboard', action: () => {
+          navigator.clipboard.writeText(handoff).then(() => {
+            botReply("Copied! Paste it in an email, chat, or document to share with your developer.");
+          });
+        }},
+      ]);
+    }, 300);
+  });
 }
 
 /* Init */
