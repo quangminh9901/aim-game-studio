@@ -1,0 +1,21 @@
+{
+  "name": "aim-game-studio",
+  "version": "1.0.0",
+  "description": "CLI toolkit for AI-powered game development. Wraps Claude Code with guided game-dev workflows.",
+  "bin": {
+    "aim": "./bin/aim.js"
+  },
+  "keywords": ["gamedev", "claude", "ai", "game-studio", "cli"],
+  "author": "AIM Studio",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "inquirer": "^9.3.0",
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module"
+}
