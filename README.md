@@ -99,6 +99,17 @@ aim launch        Ship it!
 | Unity | C# | Cross-platform, mobile |
 | Unreal 5 | C++ / Blueprint | AAA, high-fidelity 3D |
 
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Getting Started](docs/GETTING-STARTED.md) | Full setup guide from zero |
+| [Commands Reference](docs/COMMANDS.md) | Detailed usage for every command |
+| [Workflow Guide](docs/WORKFLOW.md) | Recommended process from idea to launch |
+| [Templates](docs/TEMPLATES.md) | Pre-configured project setups |
+| [Architecture](docs/ARCHITECTURE.md) | How AIM connects to Claude Code |
+| [FAQ](docs/FAQ.md) | Frequently asked questions |
+
 ## License
 
 MIT
